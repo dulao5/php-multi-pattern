@@ -7,7 +7,7 @@ php-multi-pattern 是一个php实现的*多模式匹配*类。
 
 因此这个项目只有两百多行PHP代码，并不是一个C写的PHP扩展。
 
-我自己曾经用它过滤上万个关键词，性能还可以。
+我自己曾经用它过滤过上万个关键词，性能还可以。
 
 php-multi-pattern is a php class library of Multiple String-Pattern Matching , it uses the php-pcre.
 
