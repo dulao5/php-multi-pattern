@@ -6,12 +6,12 @@
  * @case 1. match the multiple-keywords :
  *          eg.
  *          $mp = new MultiPattern(array('ab', 'abc', 'axy', 'def'));
- *          $result = $mp->match('xxxx abc def', $matches);     // $result === 1 ; $matches === 'abc'
+ *          $result = $mp->match('xxxx abc def', $match);     // $result === 1 ; $match === 'abc'
  *
  * @case 2. match all multiple-keywords in text :
  *          eg.
  *          $mp = new MultiPattern(array('ab', 'abc', 'axy', 'def'));
- *          $result = $mp->matchAll('xxxx abc def', $matches);     // $result === 2 ; $matches === array('abc', 'def')
+ *          $result = $mp->matchAll('xxxx abc def', $matches);     // $result === 2 ; $matches == array('abc', 'def')
  *
  * @case 3. build multiple-keywords as a Regular expressions
  *          eg.
@@ -22,15 +22,29 @@
 class MultiPattern {
 
 	protected static $DEFAULT_OPTIONS = array(
+			self::CASE_INSENSITIVE => true ,
+			self::WORD_BOUNDARY => false,
+			self::CONVERT_KANA_OPTS => 'KVas',
 			);
 
 	public function __construct($words , $opts=array()) {
-		$this->wtree = self::createWordTree($words);
 		$this->opts = $opts + self::$DEFAULT_OPTIONS;
+		
+		if($this->opts[self::WORD_BOUNDARY]) {
+			$words = $this->insertWordBoundary($words);
+		}
+		if($this->opts[self::CONVERT_KANA_OPTS]) {
+			$words = $this->convertArrayKana($words);
+		}
+
+		$this->wtree = self::createWordTree($words);
 	}
 
 	public function match($str, &$match) {
 		$match = null;
+		if($this->opts[self::CONVERT_KANA_OPTS]) {
+			$str = $this->convertKana($str);
+		}
 		foreach($this->getRegexList() as $regex) {
 			$r = preg_match($regex, $str, $m);
 			if($r === false) {
@@ -47,6 +61,9 @@ class MultiPattern {
 	public function matchAll($str, &$matches) {
 		$result = 0;
 		$matches = array();
+		if($this->opts[self::CONVERT_KANA_OPTS]) {
+			$str = $this->convertKana($str);
+		}
 		foreach($this->getRegexList() as $regex) {
 			$r = preg_match_all($regex, $str, $m);
 			if($r === false) {
@@ -66,13 +83,54 @@ class MultiPattern {
 	}
 
 	public function getRegexList() {
-		if($this->regexList) return $this->regexList;
-		return $this->regexList = self::generat($this->wtree);
+		if($this->regexList) {
+			return $this->regexList;
+		}
+
+		$modifiers = $this->opts[self::CASE_INSENSITIVE] ? 'i' : '';
+		$regexList = self::generat($this->wtree , '/' , $modifiers);
+
+		$this->regexList = $this->opts[self::WORD_BOUNDARY] 
+			? $this->replaceToWordBoundary($regexList) : $regexList;
+
+		return $this->regexList;
+	}
+
+	protected function convertKana($string){
+		return mb_convert_kana($string ,  $this->opts[self::CONVERT_KANA_OPTS]);
+	}
+
+	protected function convertArrayKana($words){
+		$r = array();
+		foreach($words as $word){
+			$r[] = $this->convertKana($word);
+		}
+		return $r;
+	}
+
+	protected function insertWordBoundary($words){
+		$r = array();
+		foreach($words as $word){
+			if(preg_match('/^[a-zA-Z]+$/', $word)){
+				$r[] = "\000$word\000";
+			}
+			else {
+				$r[] = "$word";
+			}
+		}
+		return $r;
+	}
+
+	protected static function replaceToWordBoundary($words){
+		$r = array();
+		foreach($patterns_en as $pattern) $r[] = str_replace('\x00', '\b', $pattern);
+		return $r;
 	}
 
 	const REGEX_SUB_PATTEM_LIMIT = 200;
-	const REGEX_DELIMITERS = 0;
-	const REGEX_MODIFIERS = 1;
+	const CASE_INSENSITIVE = 0;
+	const WORD_BOUNDARY = 1;
+	const CONVERT_KANA_OPTS = 2;
 
 	protected $wtree = null;
 	protected $opts = null;
@@ -222,7 +280,7 @@ class MultiPattern {
 				$arr[] = $char{$i};
 			}
 			else{
-				$arr[] = sprintf("\\x%X", ord($char{$i}));
+				$arr[] = sprintf("\\x%02x", ord($char{$i}));
 			}
 		}
 		return implode('',$arr);
