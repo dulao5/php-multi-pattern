@@ -20,10 +20,9 @@ $regex = $mp->getFullRegex();     // $regex === '/a(bc?|xy)|def/i'
 assert('/a(bc?|xy)|def/i' === $regex);
 
 
-
 //@case 4. multi-match 10000 keywords from 10000 texts
 
-echo "multi-match 10000 keywords from 10000 texts\n";
+echo "10000つのキーワードを10000回テスト\n";
 
 $keywords = array();
 while(1){
@@ -36,8 +35,12 @@ $mp = new MultiPattern($keywords);
 
 $texts = array();
 for($i=0; $i<10000; $i++) {
-	$texts[] = base64_encode(file_get_contents('/dev/urandom', NULL, NULL, 0, 1024)) . " " . $keywords[$i];
+	//キーワードが含む確率は　１／４に想定
+	$tail_string = (0 == (mt_rand() % 4)) ? $keywords[$i] : "";
+	$texts[] = base64_encode(file_get_contents('/dev/urandom', NULL, NULL, 0, 1024)) . " " . $tail_string;
 }
+
+shuffle($keywords); //$keywordsで同じ順ではなくで検索…
 
 $begin_time = microtime(true);
 for($i=0; $i<10000; $i++) {
@@ -46,12 +49,28 @@ for($i=0; $i<10000; $i++) {
 		$first_time = microtime(true);
 		echo "first time: ". ($first_time - $begin_time) ." Sec. \n";
 	}
-	assert($match[0] == $keywords[$i]); 	//should be $keywords[$i]
 }
 $end_time = microtime(true);
-echo "10000th matched\n";
-echo "total: ". ($end_time - $begin_time) ." Sec.\n";
-echo "10000 times mean: ". (($end_time - $begin_time)/10000) ." Sec.\n";
+echo "php-multi-patternで10000つのキーワードを10000回テスト\n";
+echo "総時間: ". ($end_time - $begin_time) ." Sec.\n";
+echo "10000回平均: ". (($end_time - $begin_time)/10000) ." Sec.\n";
+
+//@case 6. method by str_pos method
+$begin_time = microtime(true);
+for($i=0; $i<10000; $i++) {
+	$hit = false;
+	foreach($keywords as $key) {
+		$r = strpos($texts[$i], $key);
+		if($r !== false) {
+			$hit = $key;
+			break;
+		}
+	}
+}
+$end_time = microtime(true);
+echo "\nforeach-strposで10000つのキーワードを10000回テスト\n";
+echo "総時間: ". ($end_time - $begin_time) ." Sec.\n";
+echo "10000回平均: ". (($end_time - $begin_time)/10000) ." Sec.\n";
 
 
 function random_word() {
